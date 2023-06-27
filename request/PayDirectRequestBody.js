@@ -5,6 +5,8 @@ export default class PayDirectRequestBody {
   static _orderId$ = '_orderId'
   static _amount$ = '_amount'
   static _currency$ = '_currency'
+  static billing$ = '_billing'
+  static shipping$ = '_shipping'
   static _paymentMethod$ = '_paymentMethod'
   static paymentOperation$ = '_paymentOperation'
   static callbackUrl$ = '_callbackUrl'
@@ -23,13 +25,15 @@ export default class PayDirectRequestBody {
     let callbackUrl = opts && 'callbackUrl' in opts ? opts.callbackUrl : null
     let paymentIntentId =
       opts && 'paymentIntentId' in opts ? opts.paymentIntentId : null
-
+      let _billing = opts && 'billing' in opts ? opts.billing : null
+      let _shipping = opts && 'shipping' in opts ? opts.shipping : null
     this.threeDSecureId = _threeDSecureId
     this.orderId = _orderId
     this.amount = _amount
     this.currency = _currency
     this.PaymentCard = _paymentMethod
-
+    this.billing = _billing;
+    this.shipping = _shipping;
     this.paymentOperation = paymentOperation
     this.callbackUrl = callbackUrl
     this.paymentIntentId = paymentIntentId
@@ -45,6 +49,18 @@ export default class PayDirectRequestBody {
   }
   set currency(value) {
     this[PayDirectRequestBody._currency$] = value
+  }
+  get billing() {
+    return this[PayDirectRequestBody.billing$]
+  }
+  set billing(value) {
+    this[PayDirectRequestBody.billing$] = value
+  }
+  get shipping() {
+    return this[PayDirectRequestBody.shipping$]
+  }
+  set shipping(value) {
+    this[PayDirectRequestBody.shipping$] = value
   }
   get PaymentCard() {
     return this[PayDirectRequestBody._paymentMethod$]
@@ -87,6 +103,12 @@ export default class PayDirectRequestBody {
     params[BaseRequestBody.fieldPaymentMethod] = this.PaymentCard.toMap()
     if (this.callbackUrl != null) {
       params[BaseRequestBody.fieldCallbackUrl] = this.callbackUrl
+    }
+    if (this.billing != null) {
+      params[BaseRequestBody.fieldBilling] = this.billing.toMap()
+    }
+    if (this.shipping != null) {
+      params[BaseRequestBody.fieldShipping] = this.shipping.toMap()
     }
     if (this.paymentOperation != null) {
       params[BaseRequestBody.fieldPaymentOperation] = this.paymentOperation

@@ -459,7 +459,15 @@ export default class Order {
   set transactions(value) {
     this[Order.transactions$] = value
   }
+  toString() {
+    const properties = Object.entries(this)
+      .filter(([key]) => key.startsWith('Order.'))
+      .map(([key, value]) => [key.replace('Order.', ''), value]);
 
+    const propertyStrings = properties.map(([key, value]) => `${key}: ${value}`);
+
+    return `Order { ${propertyStrings.join(', ')} }`;
+  }
   static fromJson(map) {
     if (map == null) {
       return null

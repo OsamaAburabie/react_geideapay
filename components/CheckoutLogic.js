@@ -1,49 +1,105 @@
-import React, { Component } from 'react'
-import { View, Text, StyleSheet, Image, Switch } from 'react-native'
-import { Section, Button } from './common'
-import GeideaApi from '../actions/GeideaApi'
-import InitiateAuthenticationRequestBody from '../request/InitiateAuthenticationRequestBody'
-import PayerAuthenticationRequestBody from '../request/PayerAuthenticationRequestBody'
-import PayDirectRequestBody from '../request/PayDirectRequestBody'
-import PaymentCard from '../models/PaymentCard'
-import expiryDate from '../models/expiryDate'
-import AuthenticationApiResponse from '../response/AuthenticationApiResponse'
-import OrderResponse from '../response/OrderApiResponse'
-import { formatCurrencyAmountLabel } from '../utils'
-import ThreeDSScreenModal from './ThreeDSModal'
-import Address from 'react_geideapay/models/adress';
+import React, {Component} from 'react';
+import {View, Text, StyleSheet, Image, Switch} from 'react-native';
+import {Section, Button} from './common';
+import GeideaApi from '../actions/GeideaApi';
+import InitiateV4AuthenticationRequestBody from '../request/InitiateV4AuthenticationRequestBody';
+import InitiateAuthenticationRequestBody from '../request/InitiateAuthenticationRequestBody';
+import PayerAuthenticationRequestBody from '../request/PayerAuthenticationRequestBody';
+import PayerV4AuthenticationRequestBody from '../request/PayerV4AuthenticationRequestBody';
+import PayDirectRequestBody from '../request/PayDirectRequestBody';
+import PaymentCard from '../models/PaymentCard';
+import expiryDate from '../models/expiryDate';
+import AuthenticationApiResponse from '../response/AuthenticationApiResponse';
+import OrderResponse from '../response/OrderApiResponse';
+import {formatCurrencyAmountLabel} from '../utils';
+import ThreeDSScreenModal from './ThreeDSModal';
+import Address from '../models/adress';
+
 let returnUrl = 'https://returnurl.com';
 class CheckoutLogic extends Component {
   constructor(props) {
-    super(props)
-    this.state = this._calculateState(props)
-    this.type = 'modal'
+    super(props);
+    this.state = Object.assign({}, this._calculateState(props), {
+      loading: false,
+      selectedOption: '',
+      amount: '',
+      creditCardFormValid: false,
+      creditCardFormData: {},
+      rememberMe: false,
+      threeDSecureModalVisible: false,
+      htmlBodyContent: '',
+      successResponse: '',
+      failureResponse: '',
+      orderId: null,
+      threeDSecureId: null,
+      sameAddress: true,
+      billingAddress: new Address(),
+      shippingAddress: new Address(),
+      customerEmail: null,
+      phoneNumber: null,
+      showSuccessReceipt: false,
+      showFailureReceipt: false,
+      callbackUrl: '',
+    });
+    this.type = 'modal';
     if (props.route != null && props.route.params != null) {
-      this.type = 'screen'
-      this.myProps = this.props.route.params
+      this.type = 'screen';
+      this.myProps = this.props.route.params;
     }
-    console.log(this.type, this.state)
+    this.onDataChange = this.onDataChange.bind(this);
+    this.onAddressChange = this.onAddressChange.bind(this);
+    this.handlePaymentDetails = this.handlePaymentDetails.bind(this);
+  }
+  onDataChange(form) {
+    this.setState({creditCardFormValid: form.valid});
+    this.setState({creditCardFormData: form.values});
+  }
 
-    this.onDataChange = this.onDataChange.bind(this)
-    this.onAddressChange = this.onAddressChange.bind(this)
 
+  onAddressChange(key, isBilling, value) {
+    if (isBilling) {
+      const billingAddress = { ...this.state.billingAddress, [key]: value };
+      const shippingAddress = this.state.sameAddress ? { ...this.state.shippingAddress, [key]: value } : { ...this.state.shippingAddress };
+      this.setState({ billingAddress, shippingAddress });
+    } else {
+      const shippingAddress = { ...this.state.shippingAddress, [key]: value };
+      this.setState({ shippingAddress });
+    }
+  }
+
+  handlePaymentDetails(key, value) {
+    this.setState({[key]: value});
   }
 
   _calculateState(props) {
-    var shippingAddress
-    var billingAddress
+    var shippingAddress;
+    var billingAddress;
+    var customerEmail;
+    var phoneNumber;
     if (props != null && props.shippingAddress != null) {
-      shippingAddress = props.shippingAddress
+      shippingAddress = props.shippingAddress;
     }
     if (props != null && props.billingAddress != null) {
-      billingAddress = props.billingAddress
+      billingAddress = props.billingAddress;
     }
-    var callbackUrl = 'https://returnurl.com'
+    if (props != null && props.customerEmail != null) {
+      customerEmail = props.customerEmail;
+    }
+    if (props != null && props.phoneNumber != null) {
+      phoneNumber = props.phoneNumber;
+    }
+    var callbackUrl = 'https://returnurl.com';
     if (props != null && props.route != null && props.route.params != null) {
-      shippingAddress = this.props.route.params.shippingAddress
-      billingAddress = this.props.route.params.billingAddress
-      callbackUrl = this.props.route.params.callbackUrl == '' ? 'https://returnurl.com' : this.props.route.params.callbackUrl
+      shippingAddress = this.props.route.params.shippingAddress;
+      billingAddress = this.props.route.params.billingAddress;
+      customerEmail = this.props.route.params.customerEmail;
+      phoneNumber = this.props.route.params.phoneNumber;
+      callbackUrl =
+        this.props.route.params.callbackUrl == ''
+          ? 'https://returnurl.com'
+          : this.props.route.params.callbackUrl;
     }
+
     return {
       loading: false,
       creditCardFormValid: false,
@@ -53,36 +109,76 @@ class CheckoutLogic extends Component {
       htmlBodyContent: '',
       orderId: null,
       threeDSecureId: null,
-      billingAddress: billingAddress,
-      shippingAddress: shippingAddress,
+      billingAddress: new Address(billingAddress),
+      shippingAddress: new Address(shippingAddress),
+      customerEmail: customerEmail,
+      phoneNumber: phoneNumber,
       callbackUrl: callbackUrl,
-    }
+    };
   }
 
   onPaymentSuccess(res) {
     this.props.navigation.navigate({
       name: this.myProps.previousScreen,
-      params: { successResponse: res, failureResponse: '' },
+      params: {successResponse: res, failureResponse: ''},
       merge: true,
-    })
+    });
   }
   onPaymentFailure(res) {
     this.props.navigation.navigate({
       name: this.myProps.previousScreen,
-      params: { successResponse: '', failureResponse: res },
+      params: {successResponse: '', failureResponse: res},
       merge: true,
-    })
+    });
   }
 
   closeScreen() {
-    this.props.navigation.pop(1)
+    this.props.navigation.pop(1);
   }
-  _handlePaymentRequest() {
-    const { amount, currency, publicKey, apiPassword, paymentOperation } =
-      this.type === 'modal' ? this.props : this.myProps
-    const { rememberMe, callbackUrl,  billingAddress, shippingAddress } = this.state
-    console.log(this.state)
-    this.setState({ loading: true })
+  _handlePaymentRequest(amount) {
+    const {
+      currency,
+      publicKey,
+      apiPassword,
+      paymentOperation,
+      callbackUrl,
+      phoneNumber,
+    } = this.type === 'modal' ? this.props : this.myProps;
+    const {rememberMe} = this.state;
+    const customerEmail = this.state.customerEmail ?? this.myProps.customerEmail;
+    const sameAddress = this.state.sameAddress ?? this.myProps.sameAddress;
+
+    this.setState({amount: amount});
+    this.setState({loading: true});
+    let billingAdd = new Address({
+      countryCode: this.state.billingAddress?._countryCode ?? this.myProps.billingAddress?._countryCode,
+      street: this.state.billingAddress?._street
+        ?? this.myProps.billingAddress?._street,
+      city: this.state.billingAddress?._city
+        ?? this.myProps.billingAddress?._city,
+      postCode: this.state.billingAddress?._postCode
+        ?? this.myProps.billingAddress?._postCode,
+    });
+    let shippingAdd;
+    if (sameAddress) {
+      shippingAdd = new Address({
+        countryCode: billingAdd.countryCode,
+        street: billingAdd.street,
+        city: billingAdd.city,
+        postCode: billingAdd.postCode,
+      });
+    } else {
+      shippingAdd = new Address({
+        countryCode: this.state.shippingAddress?._countryCode
+          ?? this.myProps.shippingAddress?._countryCode,
+        street: this.state.shippingAddress?._street
+          ?? this.myProps.shippingAddress?._street,
+        city: this.state.shippingAddress?._city
+          ?? this.myProps.shippingAddress?._city,
+        postCode: this.state.shippingAddress?._postCode
+          ?? this.myProps.shippingAddress?._postCode,
+      });
+    }
     this._initiateAuthentication(
       amount,
       currency,
@@ -90,15 +186,18 @@ class CheckoutLogic extends Component {
       returnUrl,
       publicKey,
       apiPassword,
-      billingAddress, 
-      shippingAddress
+      billingAdd,
+      shippingAdd,
+      customerEmail,
+      phoneNumber,
     )
-      .then((res) => {
+      .then(res => {
         let initiateAuthenticationResponse =
-          AuthenticationApiResponse.fromJson(res)
+          AuthenticationApiResponse.fromJson(res);
         if (initiateAuthenticationResponse.responseCode !== '000') {
-          return this.onPaymentFailure(initiateAuthenticationResponse)
+          return this.onPaymentFailure(initiateAuthenticationResponse);
         }
+
         this._payerAuthentication(
           amount,
           currency,
@@ -108,38 +207,41 @@ class CheckoutLogic extends Component {
           rememberMe,
           publicKey,
           apiPassword,
-          paymentOperation
+          paymentOperation,
+          customerEmail,
+          billingAdd,
+          shippingAdd,
         )
-          .then((payerAuthenticationResponse) => {
-            //console.log(payerAuthenticationResponse)
+          .then(payerAuthenticationResponse => {
+            // console.log(payerAuthenticationResponse)
             let response = AuthenticationApiResponse.fromJson(
-              payerAuthenticationResponse
-            )
+              payerAuthenticationResponse,
+            );
             if (response.responseCode === '000') {
               //handle 3d secure
               let htmlBodyContent = response.html.replace(
                 'target="redirectTo3ds1Frame"',
-                'target="_top"'
-              )
+                'target="_top"',
+              );
               htmlBodyContent = htmlBodyContent.replace(
                 'target="challengeFrame"',
-                'target="_top"'
-              )
+                'target="_top"',
+              );
               this.setState({
                 threeDSecureModalVisible: true,
                 htmlBodyContent: htmlBodyContent,
                 orderId: response.orderId,
                 threeDSecureId: response.threeDSecureId,
-              })
+              });
             } else {
-              return this.onPaymentFailure(response)
+              return this.onPaymentFailure(response);
             }
           })
-          .catch((err) => {
-            return this.onPaymentFailure(err)
-          })
+          .catch(err => {
+            return this.onPaymentFailure(err);
+          });
       })
-      .catch((err) => this.onPaymentFailure(err))
+      .catch(err => this.onPaymentFailure(err));
   }
 
   _initiateAuthentication(
@@ -149,26 +251,30 @@ class CheckoutLogic extends Component {
     returnUrl,
     publicKey,
     apiPassword,
-    billingAddressProp, 
-    shippingAddressProp
+    billingAddressProp,
+    shippingAddressProp,
+    customerEmailProp,
+    phoneNumberProp,
   ) {
-
     let billingAddress = new Address({
-      countryCode: billingAddressProp._countryCode,
-      street: billingAddressProp._street,
-      city: billingAddressProp._city,
-      postCode: billingAddressProp._postCode,
+      countryCode: billingAddressProp?._countryCode,
+      street: billingAddressProp?._street,
+      city: billingAddressProp?._city,
+      postCode: billingAddressProp?._postCode,
     });
 
     let shippingAddress = new Address({
-      countryCode: shippingAddressProp._countryCode,
-      street: shippingAddressProp._street,
-      city: shippingAddressProp._city,
-      postCode: shippingAddressProp._postCode,
+      countryCode: shippingAddressProp?._countryCode,
+      street: shippingAddressProp?._street,
+      city: shippingAddressProp?._city,
+      postCode: shippingAddressProp?._postCode,
     });
 
+    let customerEmail = customerEmailProp;
+    let phoneNumber = phoneNumberProp;
+
     let initiateAuthenticationRequestBody =
-      new InitiateAuthenticationRequestBody(
+      new InitiateV4AuthenticationRequestBody(
         amount,
         currency,
         this.state.creditCardFormData.number.replace(/\s+/g, ''),
@@ -178,15 +284,15 @@ class CheckoutLogic extends Component {
           cardOnFile: this.state.rememberMe,
           billing: billingAddress,
           shipping: shippingAddress,
-        }
-      )
-    console.log(initiateAuthenticationRequestBody.paramsMap())
-
-    return GeideaApi.initiateAuthentication(
+          customerEmail: customerEmail,
+          phoneNumber: phoneNumber
+        },
+      );
+    return GeideaApi.initiateV4Authentication(
       initiateAuthenticationRequestBody,
       publicKey,
-      apiPassword
-    )
+      apiPassword,
+    );
   }
 
   _payerAuthentication(
@@ -198,18 +304,34 @@ class CheckoutLogic extends Component {
     cardOnFile,
     publicKey,
     apiPassword,
-    paymentOperation
+    paymentOperation,
+    customerEmail,
+    billingAddressProp,
+    shippingAddressProp,
   ) {
-    let expireDate = this.state.creditCardFormData.expiry.replace(/\s+/g, '')
-    var monthYear = expireDate.split('/')
-    let exDate = new expiryDate(monthYear[0], monthYear[1])
+    let expireDate = this.state.creditCardFormData.expiry.replace(/\s+/g, '');
+    var monthYear = expireDate.split('/');
+    let exDate = new expiryDate(monthYear[0], monthYear[1]);
     let card = new PaymentCard(
       this.state.creditCardFormData.name.replace(/\s+/g, ''),
       this.state.creditCardFormData.number.replace(/\s+/g, ''),
       this.state.creditCardFormData.cvc.replace(/\s+/g, ''),
-      exDate
-    )
-    let payerAuthenticationRequestBody = new PayerAuthenticationRequestBody(
+      exDate,
+    );
+    let billingAddress = new Address({
+      countryCode: billingAddressProp?._countryCode,
+      street: billingAddressProp?._street,
+      city: billingAddressProp?._city,
+      postCode: billingAddressProp?._postCode,
+    });
+
+    let shippingAddress = new Address({
+      countryCode: shippingAddressProp?._countryCode,
+      street: shippingAddressProp?._street,
+      city: shippingAddressProp?._city,
+      postCode: shippingAddressProp?._postCode,
+    });
+    let payerAuthenticationRequestBody = new PayerV4AuthenticationRequestBody(
       amount,
       currency,
       card,
@@ -219,16 +341,17 @@ class CheckoutLogic extends Component {
         returnUrl: returnUrl,
         cardOnFile: cardOnFile,
         paymentOperation: paymentOperation,
-      }
-    )
-    console.log(payerAuthenticationRequestBody.paramsMap())
-
-    return GeideaApi.payerAuthentication(
+        customerEmail: customerEmail,
+        billing: billingAddress,
+        shipping: shippingAddress
+      },
+    );
+    return GeideaApi.payerV4Authentication(
       payerAuthenticationRequestBody,
       publicKey,
       apiPassword,
-      null
-    )
+      null,
+    );
   }
 
   _directPay(
@@ -237,136 +360,150 @@ class CheckoutLogic extends Component {
     orderId,
     threeDSecureId,
     publicKey,
-    apiPassword
+    apiPassword,
+    billingAddress,
+    shippingAddress,
   ) {
-    let expireDate = this.state.creditCardFormData.expiry.replace(/\s+/g, '')
-    var monthYear = expireDate.split('/')
-    let exDate = new expiryDate(monthYear[0], monthYear[1])
+    let expireDate = this.state.creditCardFormData.expiry.replace(/\s+/g, '');
+    var monthYear = expireDate.split('/');
+    let exDate = new expiryDate(monthYear[0], monthYear[1]);
     let card = new PaymentCard(
       this.state.creditCardFormData.name.replace(/\s+/g, ''),
       this.state.creditCardFormData.number.replace(/\s+/g, ''),
       this.state.creditCardFormData.cvc.replace(/\s+/g, ''),
-      exDate
-    )
+      exDate,
+    );
     let payDirectRequestBody = new PayDirectRequestBody(
       threeDSecureId,
       orderId,
       amount,
       currency,
-      card
-    )
-    console.log(payDirectRequestBody.paramsMap())
-
-    return GeideaApi.payDirect(payDirectRequestBody, publicKey, apiPassword)
+      card,
+      {
+        billing: billingAddress,
+        shipping: shippingAddress,
+      },
+    );
+    return GeideaApi.payDirect(payDirectRequestBody, publicKey, apiPassword);
   }
 
-  onDataChange(form) {
-    this.setState({ creditCardFormValid: form.valid })
-    this.setState({ creditCardFormData: form.values })
-  }
-
-  onAddressChange(key, isBilling, value) {
-    if(isBilling)
-    {
-      this.state.billingAddress[key] = value
-    }
-    else
-    {
-      this.state.shippingAddress[key] = value
-    }
-  }
   _closeThreeDSecureModal() {
-    const { amount, currency, publicKey, apiPassword } =
-      this.type === 'modal' ? this.props : this.myProps
-    const { orderId, threeDSecureId } = this.state
+    const {currency, publicKey, apiPassword} =
+      this.type === 'modal' ? this.props : this.myProps;
+    const {amount, orderId, threeDSecureId,sameAddress} = this.state;
+    let billingAdd = new Address({
+      countryCode: this.state.billingAddress?._countryCode
+        ?? this.myProps.billingAddress?._countryCode,
+      street: this.state.billingAddress?._street
+        ?? this.myProps.billingAddress?._street,
+      city: this.state.billingAddress?._city
+        ?? this.myProps.billingAddress?._city,
+      postCode: this.state.billingAddress?._postCode
+        ?? this.myProps.billingAddress?._postCode,
+    });
+    let shippingAdd;
+    if (sameAddress) {
+      shippingAdd = new Address({
+        countryCode: billingAdd.countryCode,
+        street: billingAdd.street,
+        city: billingAdd.city,
+        postCode: billingAdd.postCode,
+      });
+    } else {
+      shippingAdd = new Address({
+        countryCode: this.state.shippingAddress?._countryCode
+          ?? this.myProps.shippingAddress?._countryCode,
+        street: this.state.shippingAddress?._street
+          ?? this.myProps.shippingAddress?._street,
+        city: this.state.shippingAddress?._city
+          ?? this.myProps.shippingAddress?._city,
+        postCode: this.state.shippingAddress?._postCode
+          ?? this.myProps.shippingAddress?._postCode,
+      });
+    }
     if (orderId && threeDSecureId) {
       this.setState({
         threeDSecureModalVisible: false,
-      })
+      });
       this._directPay(
         amount,
         currency,
         orderId,
         threeDSecureId,
         publicKey,
-        apiPassword
+        apiPassword,
+        billingAdd,
+        shippingAdd,
       )
-        .then((res) => {
-          let orderResponse = OrderResponse.fromJson(res)
-          this.onPaymentSuccess(orderResponse)
+        .then(res => {
+          let orderResponse = OrderResponse.fromJson(res);
+          this.onPaymentSuccess(orderResponse);
         })
-        .catch((err) => this.onPaymentFailure(err))
+        .catch(err => this.onPaymentFailure(err));
     }
   }
 
-  getTextColor()
-  {
-    const props = this.type === 'modal' ? this.props : this.myProps
-    const textColor = props.textColor ? props.textColor: '#fff'
-    if(this.type === 'modal')
-    {
+  getTextColor() {
+    const props = this.type === 'modal' ? this.props : this.myProps;
+    const textColor = '#000000';
+    if (this.type === 'modal') {
       return '#000';
     }
-    return textColor
+    return textColor;
   }
-  getBackgroundColor()
-  {
-    const props = this.type === 'modal' ? this.props : this.myProps
-    const backgroundColor = props.backgroundColor ? props.backgroundColor: '#2c2222'
-    return backgroundColor
+  getBackgroundColor() {
+    const props = this.type === 'modal' ? this.props : this.myProps;
+    const backgroundColor = '#ffffff';
+    return backgroundColor;
   }
-  getLanguage()
-  {
-    const props = this.type === 'modal' ? this.props : this.myProps
-    const lang = props.lang ? props.lang: 'English'
-    return lang
+  getLanguage() {
+    const props = this.type === 'modal' ? this.props : this.myProps;
+    const lang = props.lang ? props.lang : 'English';
+    return lang;
   }
-  TitleStyle()
-  {
-    const language = this.getLanguage()
-    const textColor = this.getTextColor()
+  TitleStyle() {
+    const textColor = this.getTextColor();
     return {
       fontSize: 16,
       marginBottom: 10,
       marginTop: 40,
       fontWeight: 'bold',
       color: textColor,
-      textAlign : language === 'English' ? 'left' : 'right',
-    }
+      textAlign: 'center',
+    };
   }
-  TitleNoMarginStyle()
-  {
-    const textColor = this.getTextColor()
+  TitleNoMarginStyle() {
+    const textColor = this.getTextColor();
     return {
       fontSize: 14,
       fontWeight: 'bold',
       marginHorizontal: 10,
       color: textColor,
-    }
+    };
   }
   PaymentTitleStyle() {
-    const textColor = this.getTextColor()
-    return  {
+    const textColor = this.getTextColor();
+    return {
       fontWeight: '500',
       fontSize: 16,
       color: textColor,
-    }
+    };
   }
   TextInputRowStyle() {
-    const textColor = this.getTextColor()
-    const backgroundColor = this.getBackgroundColor()
-    const language = this.getLanguage()
-    return  {
+    const textColor = this.getTextColor();
+    const backgroundColor = this.getBackgroundColor();
+    const language = this.getLanguage();
+    return {
       marginVertical: 10,
       backgroundColor: backgroundColor,
       textColor: textColor,
       highlightColor: textColor,
-      textAlign : language === 'English' ? 'left' : 'right',
-    }
+      textAlign: language === 'English' ? 'left' : 'right',
+    };
   }
   _renderThreeDSecure() {
-    const { threeDSecureModalVisible, htmlBodyContent } = this.state
-    console.log(htmlBodyContent)
+    const {threeDSecureModalVisible, htmlBodyContent} = this.state;
+    //console.log(htmlBodyContent);
     return (
       <ThreeDSScreenModal
         visible={threeDSecureModalVisible}
@@ -374,11 +511,11 @@ class CheckoutLogic extends Component {
         content={htmlBodyContent}
         returnUrl={returnUrl}
       />
-    )
+    );
   }
 
   renderPaymentInfo() {
-    const props = this.type === 'modal' ? this.props : this.myProps
+    const props = this.type === 'modal' ? this.props : this.myProps;
     return (
       <View style={styles.paymentSummary}>
         <Image
@@ -387,19 +524,19 @@ class CheckoutLogic extends Component {
         />
         <Text style={this.PaymentTitleStyle()}>Powered by Geidea</Text>
       </View>
-    )
+    );
   }
-  renderButtonType() {
-    const props = this.type === 'modal' ? this.props : this.myProps
-    const { loading, creditCardFormValid } = this.state
-    const label = formatCurrencyAmountLabel(props)
+  renderButtonType(amount) {
+    const props = this.type === 'modal' ? this.props : this.myProps;
+    const {loading, creditCardFormValid} = this.state;
+    const label = formatCurrencyAmountLabel(props, amount);
     return (
       <Section>
         <Button
           labelText={label}
           onPress={
             creditCardFormValid && !loading
-              ? () => this._handlePaymentRequest()
+              ? () => this._handlePaymentRequest(amount)
               : null
           }
           loading={loading}
@@ -411,20 +548,28 @@ class CheckoutLogic extends Component {
           disabled={loading || !creditCardFormValid}
         />
       </Section>
-    )
+    );
   }
 
   renderRememberMe() {
-    const lang = this.getLanguage()
+    const lang = this.getLanguage();
     const toggleSwitch = () =>
-      this.setState({ rememberMe: !this.state.rememberMe })
-    const { rememberMe } = this.state
+      this.setState({rememberMe: !this.state.rememberMe});
+    const {rememberMe} = this.state;
     return (
       <Section>
-        <View style={ lang == 'English' ? styles.checkboxContainer : styles.checkboxContainerAr}>
-          <Text style={this.TitleNoMarginStyle()}> {lang == 'English' ? 'Remember my card?' : 'حفظ الكارت؟'}</Text>
+        <View
+          style={
+            lang == 'English'
+              ? styles.checkboxContainer
+              : styles.checkboxContainerAr
+          }>
+          <Text style={this.TitleNoMarginStyle()}>
+            {' '}
+            {lang == 'English' ? 'Remember my card?' : 'حفظ الكارت؟'}
+          </Text>
           <Switch
-            trackColor={{ false: '#767577', true: '#f4f3f4' }}
+            trackColor={{false: '#767577', true: '#f4f3f4'}}
             thumbColor={rememberMe ? '#ff4d00' : '#f4f3f4'}
             ios_backgroundColor="#3e3e3e"
             onValueChange={toggleSwitch}
@@ -432,7 +577,7 @@ class CheckoutLogic extends Component {
           />
         </View>
       </Section>
-    )
+    );
   }
 }
 
@@ -482,6 +627,7 @@ const styles = StyleSheet.create({
   spacing: {
     marginLeft: 12,
   },
+
   totalAmount: {
     color: '#16A085',
     fontSize: 18,
@@ -556,7 +702,7 @@ const styles = StyleSheet.create({
   closeModalIconContainer: {
     alignItems: 'flex-end',
     right: 8,
-    top: 8,
+    top: 3,
   },
   checkboxContainer: {
     flex: 1,
@@ -592,6 +738,24 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontWeight: 'bold',
   },
-})
+  CheckBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginVertical: 10,
+  },
+  successMessageContainer: {
+    backgroundColor: 'green',
+    padding: 10,
+    marginVertical: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  successMessageText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});
 
-export { CheckoutLogic, styles }
+export {CheckoutLogic, styles};

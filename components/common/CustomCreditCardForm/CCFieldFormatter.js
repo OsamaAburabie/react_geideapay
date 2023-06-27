@@ -59,7 +59,7 @@ export default class CCFieldFormatter {
         sanitized.length
       )}`
     }
-    console.log('sanitized', sanitized)
+    //console.log('sanitized', sanitized)
 
     return sanitized
   }

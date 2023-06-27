@@ -4,7 +4,9 @@ import OrderApiResponse from '../response/OrderApiResponse'
 const ROOT_URL = 'https://api.merchant.geidea.net/pgw/api'
 
 const InitiateAuthentication_URL = `${ROOT_URL}/v3/direct/authenticate/initiate`
+const InitiateAuthentication_V4_URL = `${ROOT_URL}/v4/direct/authenticate/initiate`
 const AuthenticatePayer_URL = `${ROOT_URL}/v3/direct/authenticate/payer`
+const AuthenticatePayer_V4_URL = `${ROOT_URL}/v4/direct/authenticate/payer`
 const DirectPay_URL = `${ROOT_URL}/v1/direct/pay`
 const PayWithToken_URL = `${ROOT_URL}/v1/direct/pay/token`
 const Cancel_URL = `${ROOT_URL}/v1/direct/cancel`
@@ -12,37 +14,50 @@ const Capture_URL = `${ROOT_URL}/v1/direct/capture`
 const Refund_URL = `${ROOT_URL}/v1/direct/refund`
 const VoidOperation_URL = `${ROOT_URL}/v1/direct/refund`
 
-const processRequest = (path, method, data, publicKey, apiPassword) => {
+const processRequest = async (path, method, data, publicKey, apiPassword) => {
+  data.billingAddress = {
+    countryCode: data.billing?.countryCode,
+    street: data.billing?.street,
+    city: data.billing?.city,
+    postCode: data.billing?.postCode,
+  } 
+  data.shippingAddress = {
+    countryCode: data.shipping?.countryCode,
+    street: data.shipping?.street,
+    city: data.shipping?.city,
+    postCode: data.shipping?.postCode,
+  } 
   const url = path
   var utf8 = require('utf8')
   const utf8Bytes = utf8.encode(publicKey + ':' + apiPassword)
   const credentials = base64.encode(utf8Bytes)
 
-  return fetch(url, {
-    method: method,
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      authorization: 'Basic ' + credentials,
-    },
-    body: JSON.stringify(data),
-  })
-    .then((response) => response.json())
-    .then((json) => {
-      return json
+  try {
+    const response = await fetch(url, {
+      method: method,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        authorization: 'Basic ' + credentials,
+      },
+      body: JSON.stringify(data),
     })
-    .catch((err) => {
-      console.log('Error in fetch' + err)
-      throw err
-    })
+    const json = await response.json()
+    return json
+  } catch (err) {
+    console.log('Error in fetch' + err)
+    throw err
+  }
 }
 
 class GeideaApi {
   static _processPayment(url, publicKey, apiPassword, payload) {
+    console.log('API_URL',url)
+    console.log('API_PAYLOAD',payload)
     return new Promise((resolve, reject) => {
       processRequest(url, 'POST', payload, publicKey, apiPassword)
         .then((res) => {
-          console.log(res)
+          console.log('API_RESPONSE',res)
           if (
             res.detailedResponseCode != null &&
             res.detailedResponseCode === '000'
@@ -58,7 +73,7 @@ class GeideaApi {
           }
         })
         .catch((err) => {
-          console.log('err:' + err)
+          console.log('API_ERROR',err)
           reject(err)
         })
     })
@@ -72,6 +87,38 @@ class GeideaApi {
     const processPayment = async () => {
       const apiResponse = await this._processPayment(
         InitiateAuthentication_URL,
+        PublicKey,
+        ApiPassword,
+        initiateAuthenticationRequestBody.paramsMap()
+      )
+      return apiResponse
+    }
+    let myPromise = new Promise(function (myResolve, myReject) {
+      let apiResponse = processPayment()
+      apiResponse
+        .then((res) => {
+          let response = AuthenticationApiResponse.fromJson(res)
+          if (response.responseCode === '000') {
+            myResolve(response)
+          } else {
+            myReject(response.detailedResponseMessage)
+          }
+        })
+        .catch((err) => {
+          myReject(err)
+        })
+    })
+    return myPromise
+  }
+
+  static initiateV4Authentication(
+    initiateAuthenticationRequestBody,
+    PublicKey,
+    ApiPassword
+  ) {
+    const processPayment = async () => {
+      const apiResponse = await this._processPayment(
+        InitiateAuthentication_V4_URL,
         PublicKey,
         ApiPassword,
         initiateAuthenticationRequestBody.paramsMap()
@@ -118,7 +165,6 @@ class GeideaApi {
           ? apiResponse.responseCode.toLowerCase()
           : null
       if (status === 'success' && code === '000') {
-        console.log(apiResponse.htmlBodyContent)
         let htmlBodyContent = apiResponse.htmlBodyContent.replace(
           'target="redirectTo3ds1Frame"',
           'target="_top"'
@@ -131,7 +177,69 @@ class GeideaApi {
           })
         }
       }
-      console.log('apiResponse ' + apiResponse)
+      return apiResponse
+    }
+    if (navigationProp == null) {
+      return processPayment()
+    }
+    let myPromise = new Promise(function (myResolve, myReject) {
+      let apiResponse = processPayment()
+      apiResponse.catch((err) => {
+        console.log('err:' + err)
+        myReject(err)
+      })
+      navigationProp.addListener('focus', () => {
+        apiResponse
+          .then((res) => {
+            let response = AuthenticationApiResponse.fromJson(res)
+            if (response.responseCode === '000') {
+              myResolve(response)
+            } else {
+              myReject(response.detailedResponseMessage)
+            }
+          })
+          .catch((err) => {
+            console.log('apiResponse error ' + err)
+            myReject(err)
+          })
+      })
+    })
+    return myPromise
+  }
+  static payerV4Authentication(
+    payerAuthenticationRequestBody,
+    PublicKey,
+    ApiPassword,
+    navigationProp
+  ) {
+    const processPayment = async () => {
+      const apiResponse = await this._processPayment(
+        AuthenticatePayer_V4_URL,
+        PublicKey,
+        ApiPassword,
+        payerAuthenticationRequestBody.paramsMap()
+      )
+      let status =
+        apiResponse.responseMessage != null
+          ? apiResponse.responseMessage.toLowerCase()
+          : null
+      let code =
+        apiResponse.responseCode != null
+          ? apiResponse.responseCode.toLowerCase()
+          : null
+      if (status === 'success' && code === '000') {
+        let htmlBodyContent = apiResponse.htmlBodyContent.replace(
+          'target="redirectTo3ds1Frame"',
+          'target="_top"'
+        )
+        if (navigationProp) {
+          navigationProp.push('Browser', {
+            title: '3DS',
+            content: htmlBodyContent,
+            returnUrl: payerAuthenticationRequestBody.returnUrl,
+          })
+        }
+      }
       return apiResponse
     }
     if (navigationProp == null) {

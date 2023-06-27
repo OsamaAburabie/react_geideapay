@@ -20,6 +20,6 @@ export const formatAmount = (amount) => {
     .replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
 }
 
-export const formatCurrencyAmountLabel = (props) => {
-  return `PAY ${formatAmount(props.amount)} ${props.currency}`
+export const formatCurrencyAmountLabel = (props,amount) => {
+  return `PAY ${formatAmount(amount)} ${props.currency}`
 }

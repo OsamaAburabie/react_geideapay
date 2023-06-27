@@ -38,6 +38,16 @@ const s = StyleSheet.create({
     height: 45,
     fontSize: 16,
   },
+   arabicinputLabel: {
+    fontSize: 14,
+    color: '#666666',
+    textAlign: 'right',
+  },
+  arabicinput: {
+    height: 45,
+    fontSize: 16,
+    textAlign: 'right',
+  },
   inputContainer: {
     marginBottom: 20,
   },
@@ -84,7 +94,7 @@ export default class CreditCardInput extends Component {
     cardBrandIcons: PropTypes.object,
 
     allowScroll: PropTypes.bool,
-
+    lang: PropTypes.oneOf(['English', 'Arabic']),
     additionalInputsProps: PropTypes.objectOf(
       PropTypes.shape(TextInput.propTypes)
     ),
@@ -113,6 +123,7 @@ export default class CreditCardInput extends Component {
     },
     validColor: '',
     invalidColor: 'red',
+    lang:'English',
     placeholderColor: 'gray',
     allowScroll: false,
     additionalInputsProps: {},
@@ -159,11 +170,18 @@ export default class CreditCardInput extends Component {
       onBecomeEmpty,
       onBecomeValid,
       additionalInputsProps,
+      lang
     } = this.props
-
+    const placeholderLabel = {
+      name: lang === 'English'? 'Card Holder Name' : 'اسم صاحب البطاقة',
+    number: lang === 'English'? 'Card Number' : 'رقم البطاقة',
+    expiry: lang === 'English'? 'Expiry Date' : 'تاريخ الإنتهاء',
+    cvc: lang === 'English'? 'CCV' : 'الرقم الأمني',
+      postalCode: lang === 'English' ? 'Postal Code' : 'الرمز البريدي',
+    };
     return {
-      inputStyle: [s.input, inputStyle],
-      labelStyle: [s.inputLabel, labelStyle],
+      inputStyle: lang=== 'Arabic' ? [s.arabicinput, inputStyle] : [s.input, inputStyle],
+      labelStyle: lang === 'Arabic' ? [s.arabicinputLabel, labelStyle] : [s.inputLabel, labelStyle],
       validColor,
       invalidColor,
       placeholderColor,
@@ -171,7 +189,8 @@ export default class CreditCardInput extends Component {
       field,
 
       label: labels[field],
-      placeholder: placeholders[field],
+      //placeholder: placeholders[field],
+      placeholder:placeholderLabel[field],
       value: values[field],
       status: status[field],
 
@@ -261,3 +280,4 @@ export default class CreditCardInput extends Component {
     )
   }
 }
+

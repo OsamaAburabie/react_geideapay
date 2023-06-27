@@ -68,7 +68,7 @@ const CreateCard = (props) => {
       valid.cvv(creditCard.cvc).isValid &&
       creditCard.name != ''
     props.onChange({ values: creditCard, valid: allValid })
-    console.log(creditCard)
+    //console.log(creditCard)
   }
 
 

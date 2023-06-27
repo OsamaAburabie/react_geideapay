@@ -4,7 +4,7 @@ import { CreditCardInput } from './CustomCreditCardForm/index'
 
 const CreditCard = (props) => {
   const { onChange } = props
-  return <CreditCardInput requiresName={true} onChange={onChange} />
+  return <CreditCardInput lang={props.lang} requiresName={true} onChange={onChange} />
 }
 
 export { CreditCard }
