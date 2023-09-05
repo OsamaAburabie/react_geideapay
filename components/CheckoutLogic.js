@@ -89,7 +89,7 @@ class CheckoutLogic extends Component {
     if (props != null && props.phoneNumber != null) {
       phoneNumber = props.phoneNumber;
     }
-    var callbackUrl = "https://returnurl.com";
+    var callbackUrl = "https://053b-149-200-253-224.ngrok-free.app/return";
     if (props != null && props.route != null && props.route.params != null) {
       shippingAddress = this.props.route.params.shippingAddress;
       billingAddress = this.props.route.params.billingAddress;
@@ -97,7 +97,7 @@ class CheckoutLogic extends Component {
       phoneNumber = this.props.route.params.phoneNumber;
       callbackUrl =
         this.props.route.params.callbackUrl == ""
-          ? "https://returnurl.com"
+          ? "https://053b-149-200-253-224.ngrok-free.app/return"
           : this.props.route.params.callbackUrl;
     }
 
